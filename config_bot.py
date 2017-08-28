@@ -1,2 +1,0 @@
-REDDIT_USERNAME = 'artcbot'  # YOUR USERNAME as string
-REDDIT_PASS = 'd015163'  # YOUR PASSWORD as string
