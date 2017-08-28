@@ -1,9 +1,10 @@
-#!/usr/bin/python3
+#!/Users/sfdavis/anaconda3/bin/python
 
 #ARTCbot. Responds to ! commands 
 #To do list:
 #1 - Calendar integration? !upcoming <user> and !upcoming 
 #2 - Training paces from popular books. Pfitz, JD, Hansons, Lore of Running.
+#3 - Make getting time from comment a function. (might be best for the slack version if everything was a function, pass comments to main and slack version can pass to main as well)
 
 import praw
 from config_bot import *
@@ -20,7 +21,7 @@ subreddit_comments = subreddit.get_comments()
 
 #Functions to read and write files into arrays.
 def get_array(input_string):
-    with open("textfiles/"+input_string+".txt","r") as f:
+    with open(input_string+".txt","r") as f:
         input_array = f.readlines()
     input_array = [x.strip("\n") for x in input_array]
     return(input_array)
@@ -41,7 +42,7 @@ for i in jd_paces:
     temp_array.append(i.split(','))
 jd_paces = temp_array[1:]
 #Defining built in commands
-built_in = ["add","edit","delete","vdot","planner","pacing","splits","convertpace","convertdistance","trainingpaces"]
+built_in = ["add","edit","delete","vdot","planner","pacing","splits","convertpace","convertdistance"]
 #Defining VDOT ranges
 vdot_range=[30.0,85.0]
 
@@ -51,24 +52,6 @@ print("\n * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * \n
 contributors=[]
 for contributor in subreddit.get_contributors():
     contributors.append(str(contributor))
-
-#Function to return date to start training
-def planner(date,time):
-    formatting = date.split('/')
-    #Checking the date format
-    if(len(formatting[0]) > 2 or len(formatting[1]) > 2 or len(formatting[2]) > 2):
-        return "Your date is the wrong format. Please put your date in mm/dd/yy format."
-    date = datetime.strptime(date, "%m/%d/%y")
-    time_new = date - timedelta(weeks=int(time))
-    return "For a "+time+" week plan, start training on "+str(time_new.month)+"/"+str(time_new.day)+"/"+str(time_new.year)+"."
-
-#Function to get the time from a comment and return seconds
-def get_time(time):
-    time = time.split(':')
-    if(len(time) < 3):
-        return float(time[0])+float(time[1])/60.0
-    elif(len(time) == 3):
-        return float(time[0])*60.0+float(time[1])+float(time[2])/60.0
 
 #Time formatting function. Time given in minutes as a float.
 def time_format(time):
@@ -125,7 +108,7 @@ def convert(time, distance, unit,inputs, string):
 
         #Checking command
         if(string == "!convertdistance"):
-            message = str(distance)+" kilometers is "+distance_conversion+" miles."
+            message = str(distance)+" kilometers is "+distance_conversion+" ~~freedom units~~ miles."
         if(string == "!convertpace"):
             message = "A "+inputs+" kilometer is a "+str(minutes)+":"+str_seconds+" mile."
         if(string == "!splits"):
@@ -150,12 +133,10 @@ for comment in subreddit_comments:
         del already_done[0]
         write_out("already_done",already_done)
 
-        #Saving comment
-        comment_list = str(comment.body)
-        comment_list = comment_list.split()
-
         #Adding commands
         if(comment.body.count("!add") and str(comment.author) in contributors):
+            comment_list = str(comment.body)
+            comment_list = comment_list.split()
             #Finding command to add
             index = comment_list.index("!add")
             add_command = comment_list[index+1]
@@ -191,6 +172,8 @@ for comment in subreddit_comments:
 
         #Deleting commands
         if(comment.body.count("!delete") and str(comment.author) in contributors):
+            comment_list = str(comment.body)
+            comment_list = comment_list.split()
             #Finding command user wants to delete
             index = comment_list.index("!delete")
             delete_command = comment_list[index+1]
@@ -206,6 +189,8 @@ for comment in subreddit_comments:
 
         #Editing commands
         if(comment.body.count("!edit") and str(comment.author) in contributors):
+            comment_list = str(comment.body)
+            comment_list = comment_list.split()
             #Finding command user wants to edit
             index = comment_list.index("!edit")
             edit_command = comment_list[index+1]
@@ -266,7 +251,9 @@ for comment in subreddit_comments:
             comment.reply(reply)
             break
 
-        #Finding if comment has any commands.
+        #Splitting up the comment text by white space and seeing if it has any commands
+        comment_list = str(comment.body)
+        comment_list = comment_list.split()
         common = list(set(comment_list).intersection(command_list))
         #Replying if there is a command
         if(len(common) > 0 and common.count("!help") < 1):
@@ -289,7 +276,12 @@ for comment in subreddit_comments:
             indices = [i for i, x in enumerate(comment_list) if x == "!convertpace"]
             for i in indices:
                 unit = comment_list[i+2].lower()
-                time = get_time(comment_list[i+1])
+                time = comment_list[i+1]
+                time = time.split(':')
+                if(len(time) < 3):
+                    time = float(time[0])+float(time[1])/60.0
+                elif(len(time) == 3):
+                    time = float(time[0])*60.0+float(time[1])+float(time[2])/60.0
                 reply += "\n\n"+convert(time, 1, unit, comment_list[i+1], "!convertpace")
 
         #Track split calculator
@@ -297,31 +289,55 @@ for comment in subreddit_comments:
             indices = [i for i, x in enumerate(comment_list) if x == "!splits"]
             for i in indices:
                 unit = comment_list[i+2].lower()
-                time = get_time(comment_list[i+1])
+                time = comment_list[i+1]
+                time = time.split(':')
+                if(len(time) < 3):
+                    time = float(time[0])+float(time[1])/60.0
+                elif(len(time) == 3):
+                    time = float(time[0])*60.0+float(time[1])+float(time[2])/60.0
                 reply += "\n\n"+convert(time, 1, unit, comment_list[i+1], "!splits")
 
         #Training plan calculator
         if(comment.body.count("!planner")):
             indices = [i for i, x in enumerate(comment_list) if x == "!planner"]
             for i in indices:
-                reply += "\n\n"+planner(comment_list[i+1],comment_list[i+2])
+                date = comment_list[i+1]
+                formatting = date.split('/')
+                #Checking the date format
+                if(len(formatting[0]) > 2 or len(formatting[1]) > 2 or len(formatting[2]) > 2):
+                    comment.reply("Your date is the wrong format. Please put your date in mm/dd/yy format.")
+                    break
+                time= comment_list[i+2]
+                date = datetime.strptime(date, "%m/%d/%y")
+                time_new = date - timedelta(weeks=int(time))
+                reply += "\n\n"+"For a "+time+" week plan, start training on "+str(time_new.month)+"/"+str(time_new.day)+"/"+str(time_new.year)+"."
 
         #Race pace calculator
         if(comment.body.count("!pacing")):
             indices = [i for i, x in enumerate(comment_list) if x == "!pacing"]
             for i in indices:
-                time = get_time(comment_list[i+1])
+                time = comment_list[i+1]
+                time = time.split(':')
                 distance = float(comment_list[i+2])
                 unit = comment_list[i+3].lower()
+                if(len(time) < 3):
+                    time = float(time[0])+float(time[1])/60.0
+                elif(len(time) == 3):
+                    time = float(time[0])*60.0+float(time[1])+float(time[2])/60.0
                 reply += "\n\n"+convert(time, distance, unit, comment_list[i+1], "!pacing")
             
         #VDOT calculator
         if(comment.body.count("!vdot")):
             indices = [i for i, x in enumerate(comment_list) if x == "!vdot"]
             for i in indices:
-                time = get_time(comment_list[i+1])
+                time = comment_list[i+1]
+                time = time.split(':')
                 distance = float(comment_list[i+2])
                 unit = comment_list[i+3].lower()
+                if(len(time) < 3):
+                    time = float(time[0])+float(time[1])/60.0
+                elif(len(time) == 3):
+                    time = float(time[0])*60.0+float(time[1])+float(time[2])/60.0
                 reply += "\n\n"+convert(time, distance, unit, comment_list[i+1], "!vdot")
 
         #Paces based on VDOT
@@ -330,9 +346,16 @@ for comment in subreddit_comments:
             for i in indices:
                 if(len(comment_list) > 2):
                     if(comment_list[i+3] == 'miles' or comment_list[i+3] == 'kilometers' or comment_list[i+3] == 'mile' or comment_list[i+3] == 'kilometer' or comment_list[i+3] == 'm' or comment_list[i+3] == 'km'):
-                        time = get_time(comment_list[i+1])
+                        #Function to create
+                        time = comment_list[i+1]
+                        time = time.split(':')
                         distance = float(comment_list[i+2])
                         unit = comment_list[i+3].lower()
+                        if(len(time) < 3):
+                            time = float(time[0])+float(time[1])/60.0
+                        elif(len(time) == 3):
+                            time = float(time[0])*60.0+float(time[1])+float(time[2])/60.0
+                        #End function
                         v_dot = convert(time, distance, unit, comment_list[i+1], "!trainingpaces")
                         reply += "\n\nA "+comment_list[i+1]+" "+str(distance)+" "+unit+" corresponds to a "+str(v_dot)+" VDOT."
                         #Rounding

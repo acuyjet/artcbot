@@ -11,8 +11,8 @@ sc = SlackClient(slack_token)
 def sendMessage(user, channel, message):
     sc.api_call(
         "chat.postMessage",
-        username = "Patriots Bot",
-        icon_emoji = ":elvis:",
+        username = "artcbot",
+        icon_emoji = ":robot_face:",
         channel=channel,
         link_names=1,
         text= '<@'+user +'>' +' '+ message)      
