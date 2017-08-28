@@ -97,6 +97,13 @@ if sc.rtm_connect():
                         unit = message[2]
                     message = artcbot.convert(1,distance,unit,1,command)
                     sendMessage(user, channel, message) 
+                elif events["text"].startswith(("!planner")):
+                    channel = getChannel(events)
+                    user = getUser(events)
+                    message = events["text"].split(' ')
+                    command = message[0]
+                    message = artcbot.planner(message[1],message[2])
+                    sendMessage(user, channel, message)
         time.sleep(1)
 else:
     print "Connection Failed, invalid token?"
